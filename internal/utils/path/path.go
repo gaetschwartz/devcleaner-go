@@ -239,7 +239,11 @@ func (p *ExistingPath) WriteToBuilder(builder *strings.Builder) {
 }
 
 func (p *PathPatternEvaluator) evaluateEither(either string) (ExistingPath, error) {
-	options := strings.Split(either, ",")
+	options, err := SplitCommaSeparatedString(either)
+	if err != nil {
+		return "", err
+	}
+	p.l.Debug("Split either", "either", either, "options", options)
 	for _, option := range options {
 		subEvaluator := &PathPatternEvaluator{
 			pattern:    option,
@@ -289,4 +293,48 @@ func findClosingBracket(s string) int {
 		}
 	}
 	return -1
+}
+
+func SplitCommaSeparatedString(s string) ([]string, error) {
+	// We need to take in account that fact that commas could be escaed or nested in another pattern
+	// For example:
+	//   [/path1,{env.HOME}/[path2,path3],/path4]
+	// should be evaluated as:
+	//   /path1
+	//   {env.HOME}/path2
+	//   {env.HOME}/path3
+	//   /path4
+	l := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug}))
+	var result []string
+	i := 0
+	chunk_start := 0
+	for ; i < len(s); i++ {
+		switch s[i] {
+		case '\\':
+			i++
+		case ',':
+			result = append(result, s[chunk_start:i])
+			i++
+			chunk_start = i
+			l.Debug("Found comma", "chunk", s[chunk_start:i])
+		case '[':
+			closingBracket := findClosingBracket(s[i:])
+			if closingBracket == -1 {
+				return nil, errors.New("unmatched opening bracket")
+			}
+			i += closingBracket + 1
+		case '{':
+			closingBrace := findClosingBrace(s[i:])
+			if closingBrace == -1 {
+				return nil, errors.New("unmatched opening brace")
+			}
+			i += closingBrace + 1
+		}
+	}
+	rest := s[chunk_start:]
+	if len(rest) > 0 {
+		l.Debug("Found rest", "rest", rest)
+		result = append(result, rest)
+	}
+	return result, nil
 }
