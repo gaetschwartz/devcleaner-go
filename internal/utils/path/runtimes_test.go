@@ -14,7 +14,7 @@ func F(i int, elem string) (string, error) {
 }
 
 func FDelayed(i int, elem string) (string, error) {
-	time.Sleep(time.Millisecond * 10 * time.Duration(i))
+	time.Sleep(time.Microsecond * 100 * time.Duration(i))
 	return (fmt.Sprintf("%02d-%s", i, elem)), nil
 }
 
@@ -38,14 +38,14 @@ func GetExpectedResults() []string {
 
 func TestSyncRunAll(t *testing.T) {
 	m := &SynchronousLifecycleManager[string, string]{}
-	results, err := m.RunAll(F, GetArray())
+	results, err := WithoutError(m.RunAll(F, GetArray()))
 	assert.NoError(t, err)
 	assert.Equal(t, GetExpectedResults(), results)
 }
 
 func TestGoRoutinesRunAll(t *testing.T) {
 	m := &GoRoutinesLifecycleManager[string, string]{quit: make(chan int)}
-	results, err := m.RunAll(F, GetArray())
+	results, err := WithoutError(m.RunAll(F, GetArray()))
 	slices.Sort(results)
 	assert.NoError(t, err)
 	assert.Equal(t, GetExpectedResults(), results)
@@ -54,7 +54,7 @@ func TestGoRoutinesRunAll(t *testing.T) {
 func TestGoRoutinesIsFaster(t *testing.T) {
 	m := &GoRoutinesLifecycleManager[string, string]{quit: make(chan int)}
 	start := time.Now()
-	results, err := m.RunAll(FDelayed, GetArray())
+	results, err := WithoutError(m.RunAll(FDelayed, GetArray()))
 	took1 := time.Since(start)
 	assert.NoError(t, err)
 	assert.Equal(t, GetExpectedResults(), results)
@@ -62,17 +62,18 @@ func TestGoRoutinesIsFaster(t *testing.T) {
 
 	m2 := &SynchronousLifecycleManager[string, string]{}
 	start = time.Now()
-	results, err = m2.RunAll(FDelayed, GetArray())
+	results, err = WithoutError(m2.RunAll(FDelayed, GetArray()))
 	took2 := time.Since(start)
 	assert.NoError(t, err)
 	assert.Equal(t, GetExpectedResults(), results)
 	fmt.Println("Synchronous took", took2)
 
-	faster := "GoRoutines"
-	by := took2 / took1
+	faster := "faster"
+	by := float64(took2 / took1)
 	if took2 < took1 {
-		faster = "Synchronous"
-		by = took1 / took2
+		faster = "slower"
+		by = 1 / by
 	}
-	fmt.Println(faster, "is", int(by), "times faster")
+	fmt.Printf("GoRoutines is %.2fx %s than synchronous\n", by, faster)
+	assert.Lessf(t, took1, took2, "GoRoutines is faster than synchronous")
 }

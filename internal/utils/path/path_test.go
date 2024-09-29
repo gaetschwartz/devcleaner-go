@@ -24,8 +24,10 @@ func (f *MockFileSystem) Stat(name string) (int, error) {
 	f.requested = append(f.requested, name)
 
 	if info, ok := f.filesystem[name]; ok {
+		log.Println("Statting", name, "=>", info)
 		return info, nil
 	}
+	log.Println("Statting", name, "=>", os.ErrNotExist)
 	return 0, os.ErrNotExist
 }
 

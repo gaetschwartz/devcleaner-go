@@ -252,73 +252,27 @@ func (p *PathPatternEvaluator) evaluateEither(either string) (ExistingPath, erro
 		return "", err
 	}
 	p.l.Debug("Split either", "either", either, "options", options)
-	for _, option := range options {
+	Task := func(_ int, opt string) (ExistingPath, error) {
 		subEvaluator := &PathPatternEvaluator{
-			pattern:    option,
+			pattern:    opt,
 			root:       p.root,
 			context:    p.context,
 			l:          p.l,
 			filesystem: p.filesystem,
 			lifecycle:  p.lifecycle,
 		}
-		p.l.Debug("Evaluating either option", "option", option)
+		p.l.Debug("Evaluating either option", "option", opt)
 		if evaluated, err := subEvaluator.Evaluate(); err == nil {
 			p.l.Debug("Found valid path in either", "path", evaluated)
 			return ExistingPath(evaluated), nil
 		} else {
-			p.l.Debug("Skipping invalid path in either", "path", evaluated)
-			continue
-		}
-
-	}
-	return "", errors.New("no valid path found in either")
-}
-
-func (p *PathPatternEvaluator) evaluateEitherGoroutines(either string) (ExistingPath, error) {
-	options, err := SplitCommaSeparatedString(either)
-	if err != nil {
-		return "", err
-	}
-	p.l.Debug("Split either", "either", either, "options", options)
-	ch := make(chan ExistingPath, len(options))
-	defer close(ch)
-	quit := make(chan int)
-	defer close(quit)
-
-	for _, option := range options {
-		go func(option string) {
-			subEvaluator := &PathPatternEvaluator{
-				pattern:    option,
-				root:       p.root,
-				context:    p.context,
-				l:          p.l,
-				filesystem: p.filesystem,
-				lifecycle:  &GoRoutinesRuntime{quit: quit},
-			}
-			p.l.Debug("Evaluating either option", "option", option)
-			if evaluated, err := subEvaluator.Evaluate(); err == nil {
-				p.l.Debug("Found valid path in either", "path", evaluated)
-				ch <- ExistingPath(evaluated)
-			} else {
-				p.l.Debug("Skipping invalid path in either", "path", evaluated)
-				ch <- ""
-			}
-		}(option)
-	}
-	// dont wait for all goroutines to finish, just wait for the first one that returns a valid path
-	// once we have a valid path, we sent a quit signal to all the other goroutines
-	for i := 0; i < len(options); i++ {
-		select {
-		case path := <-ch:
-			if path != "" {
-				quit <- 1
-				return path, nil
-			}
-
+			p.l.Debug("Skipping invalid path in either", "option", opt, "path", evaluated)
+			return "", err
 		}
 	}
-
-	return "", errors.New("no valid path found in either")
+	res := p.lifecycle.RunAll(Task, options)
+	// p.l.Debug("Found results", "results", res)
+	return FirstResult(res)
 }
 
 func findClosingBrace(s string) int {

@@ -20,7 +20,7 @@ type GoRoutinesRuntime struct {
 
 type LifecycleManager[T, R any] interface {
 	AllowedToRun() bool
-	RunAll(func(int, T) (R, error), []T) ([]R, error)
+	RunAll(func(int, T) (R, error), []T) []TaskResult[R]
 }
 
 type SynchronousLifecycleManager[T, R any] struct {
@@ -31,16 +31,45 @@ func (m *SynchronousLifecycleManager[T, R]) AllowedToRun() bool {
 	return true
 }
 
-func (m *SynchronousLifecycleManager[T, R]) RunAll(f func(int, T) (R, error), elems []T) ([]R, error) {
-	results := make([]R, len(elems))
-	for i, elem := range elems {
-		if result, err := f(i, elem); err == nil {
-			results[i] = result
+type TaskResult[T any] struct {
+	Result T
+	Err    error
+}
+
+func FirstResult[T any](t []TaskResult[T]) (T, error) {
+	for _, r := range t {
+		if r.Err == nil {
+			return r.Result, nil
+		}
+	}
+
+	last := t[len(t)-1]
+	return last.Result, last.Err
+}
+
+func WithoutError[T any](t []TaskResult[T]) ([]T, error) {
+	results := make([]T, len(t))
+	for i, r := range t {
+		if r.Err == nil {
+			results[i] = r.Result
 		} else {
-			return nil, err
+			return nil, r.Err
 		}
 	}
 	return results, nil
+}
+
+func (m *SynchronousLifecycleManager[T, R]) RunAll(f func(int, T) (R, error), elems []T) []TaskResult[R] {
+	// fmt.Println("Running synchronously")
+	results := make([]TaskResult[R], len(elems))
+	for i, elem := range elems {
+		if result, err := f(i, elem); err == nil {
+			results[i] = TaskResult[R]{Result: result}
+		} else {
+			results[i] = TaskResult[R]{Err: err}
+		}
+	}
+	return results
 }
 
 type GoRoutinesLifecycleManager[T, R any] struct {
@@ -58,7 +87,8 @@ func (m *GoRoutinesLifecycleManager[T, R]) AllowedToRun() bool {
 	}
 }
 
-func (m *GoRoutinesLifecycleManager[T, R]) RunAll(f func(int, T) (R, error), elems []T) ([]R, error) {
+func (m *GoRoutinesLifecycleManager[T, R]) RunAll(f func(int, T) (R, error), elems []T) []TaskResult[R] {
+	// fmt.Println("Running in goroutines")
 	ch := make(chan R, len(elems))
 	defer close(ch)
 	err_ch := make(chan error, len(elems))
@@ -79,13 +109,13 @@ func (m *GoRoutinesLifecycleManager[T, R]) RunAll(f func(int, T) (R, error), ele
 	}
 	wg.Wait()
 
-	results := make([]R, len(elems))
+	results := make([]TaskResult[R], len(elems))
 	for i := 0; i < len(elems); i++ {
-		err := <-err_ch
-		if err != nil {
-			return nil, err
+		if res, err := <-ch, <-err_ch; err == nil {
+			results[i] = TaskResult[R]{Result: res}
+		} else {
+			results[i] = TaskResult[R]{Err: err}
 		}
-		results[i] = <-ch
 	}
-	return results, nil
+	return results
 }
