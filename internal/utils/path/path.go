@@ -112,6 +112,7 @@ type PathPatternEvaluator struct {
 	context    *PathContext
 	l          *slog.Logger
 	filesystem FileSystem
+	lifecycle  Runtime
 }
 
 func NewPathPatternEvaluator(pattern string) *PathPatternEvaluator {
@@ -124,6 +125,7 @@ func NewPathPatternEvaluator(pattern string) *PathPatternEvaluator {
 		context:    NewPathContext(),
 		l:          logger,
 		filesystem: &RealFileSystem{},
+		lifecycle:  &DefaultRuntime{},
 	}
 }
 
@@ -227,6 +229,10 @@ func (p *PathPatternEvaluator) evaluateVariable(variable string) (ExistingPath, 
 type ExistingPath string
 
 func (p *PathPatternEvaluator) Exists(subpath string) (ExistingPath, error) {
+	if !p.lifecycle.AllowedToRun() {
+		fmt.Println("PathPatternEvaluator.Exists(): lifecycle manager killed us :(")
+		return "", errors.New("lifecycle manager killed us :(")
+	}
 	fullPath := filepath.Join(p.root, subpath)
 	if _, err := p.filesystem.Stat(fullPath); err != nil {
 		return "", fmt.Errorf("path %s does not exist (%s)", fullPath, err)
@@ -237,6 +243,8 @@ func (p *PathPatternEvaluator) Exists(subpath string) (ExistingPath, error) {
 func (p *ExistingPath) WriteToBuilder(builder *strings.Builder) {
 	builder.WriteString(string(*p))
 }
+
+type EvalEitherFunc func(string) (ExistingPath, error)
 
 func (p *PathPatternEvaluator) evaluateEither(either string) (ExistingPath, error) {
 	options, err := SplitCommaSeparatedString(either)
@@ -251,6 +259,7 @@ func (p *PathPatternEvaluator) evaluateEither(either string) (ExistingPath, erro
 			context:    p.context,
 			l:          p.l,
 			filesystem: p.filesystem,
+			lifecycle:  p.lifecycle,
 		}
 		p.l.Debug("Evaluating either option", "option", option)
 		if evaluated, err := subEvaluator.Evaluate(); err == nil {
@@ -262,6 +271,53 @@ func (p *PathPatternEvaluator) evaluateEither(either string) (ExistingPath, erro
 		}
 
 	}
+	return "", errors.New("no valid path found in either")
+}
+
+func (p *PathPatternEvaluator) evaluateEitherGoroutines(either string) (ExistingPath, error) {
+	options, err := SplitCommaSeparatedString(either)
+	if err != nil {
+		return "", err
+	}
+	p.l.Debug("Split either", "either", either, "options", options)
+	ch := make(chan ExistingPath, len(options))
+	defer close(ch)
+	quit := make(chan int)
+	defer close(quit)
+
+	for _, option := range options {
+		go func(option string) {
+			subEvaluator := &PathPatternEvaluator{
+				pattern:    option,
+				root:       p.root,
+				context:    p.context,
+				l:          p.l,
+				filesystem: p.filesystem,
+				lifecycle:  &GoRoutinesRuntime{quit: quit},
+			}
+			p.l.Debug("Evaluating either option", "option", option)
+			if evaluated, err := subEvaluator.Evaluate(); err == nil {
+				p.l.Debug("Found valid path in either", "path", evaluated)
+				ch <- ExistingPath(evaluated)
+			} else {
+				p.l.Debug("Skipping invalid path in either", "path", evaluated)
+				ch <- ""
+			}
+		}(option)
+	}
+	// dont wait for all goroutines to finish, just wait for the first one that returns a valid path
+	// once we have a valid path, we sent a quit signal to all the other goroutines
+	for i := 0; i < len(options); i++ {
+		select {
+		case path := <-ch:
+			if path != "" {
+				quit <- 1
+				return path, nil
+			}
+
+		}
+	}
+
 	return "", errors.New("no valid path found in either")
 }
 

@@ -50,6 +50,7 @@ func TestEvaluateSimple(t *testing.T) {
 				"/Users/gaetan/devcleaner-go",
 			),
 		},
+		lifecycle: &DefaultRuntime{},
 	}
 	result, err := evaluator.Evaluate()
 	assert.NoError(t, err)
@@ -71,6 +72,7 @@ func TestEvaluateEither(t *testing.T) {
 				"/Users/gaetan/devcleaner-go",
 			),
 		},
+		lifecycle: &DefaultRuntime{},
 	}
 	result, err := evaluator.Evaluate()
 	assert.NoError(t, err)

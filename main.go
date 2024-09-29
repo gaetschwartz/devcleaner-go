@@ -1,4 +1,4 @@
-package devcleanergo
+package main
 
 import "fmt"
 

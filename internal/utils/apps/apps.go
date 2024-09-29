@@ -1,4 +1,4 @@
-package devcleanergo
+package apps
 
 import "github.com/gaetschwartz/devcleaner-go/internal/utils/path"
 

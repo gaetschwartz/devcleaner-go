@@ -1,7 +1,5 @@
 package history
 
-import "fmt"
-
 const HistorySize = 2
 
 type History[T any] interface {
@@ -73,14 +71,14 @@ func (q *BoundedHistory[T]) Restore() (T, bool) {
 	// check if the new cursor would be at a legal position
 	// i.e not out of bounds
 	lower_bound := q.written - q.size
-	fmt.Println("Trying to restore: ", q.cursor, "=>", new_cursor, "with lower bound", lower_bound, "written", q.written)
+	// fmt.Println("Trying to restore: ", q.cursor, "=>", new_cursor, "with lower bound", lower_bound, "written", q.written)
 	if new_cursor >= lower_bound {
 		// we can restore
-		fmt.Println("can restore at", new_cursor)
+		// fmt.Println("can restore at", new_cursor)
 		q.cursor = new_cursor
 		return q.queue[q.cursor%q.size], true
 	} else {
-		fmt.Println("can't restore at", new_cursor)
+		// fmt.Println("can't restore at", new_cursor)
 		// we can't restore, so we return current element
 		return q.queue[q.cursor%q.size], false
 	}
@@ -153,9 +151,8 @@ func (q *BoundedHistory[T]) SetSize(new_size int) {
 		q.queue = make([]T, new_size)
 		q.size = new_size
 		i := q.cursor % prev_size
-		new_values_size := min(new_size, i)
-		fmt.Println("Resizing history:", q.size, "=>", new_size)
-		fmt.Println("i =", i, "new_values_size =", new_values_size)
+
+		// fmt.Println("Resizing history:", prev_size, "=>", new_size)
 		// check if the cursor is greater than the previous size
 		// if so, that means that all values within the slice have been
 		// written with valid data, so we need to copy the values
@@ -167,25 +164,27 @@ func (q *BoundedHistory[T]) SetSize(new_size int) {
 			actual_size := min(new_older_buffer_size, prev_older_buffer_size)
 			if actual_size > 0 {
 				offset := prev_older_buffer_size - actual_size
-				fmt.Println("Offset:", offset, "actual_size:", actual_size)
+				// fmt.Println("Offset:", offset, "actual_size:", actual_size)
 				older_values := prev_queue[i+1:][offset:]
 
-				fmt.Println("We have already done a cycle so values after the cursor are older values")
-				fmt.Println("Cursor is at", i, "and we have", prev_size, "values, so we need to copy", actual_size, "values")
-				fmt.Println("Older values:", older_values)
-				fmt.Println("We copy them to at [0:actual_size]")
+				// fmt.Println("We have already done a cycle so values after the cursor are older values")
+				// fmt.Println("Cursor is at", i, "and we have", prev_size, "values, so we need to copy", actual_size, "values")
+				// fmt.Println("Older values:", older_values)
+				// fmt.Println("We copy them to at [0:actual_size]")
 				copy(q.queue[:actual_size], older_values)
 				written = actual_size - 1
-				fmt.Println("We have written", written, "older values")
+				// fmt.Println("We have written", written, "older values")
 			} else {
-				fmt.Println("We have no space to copy older values, skipping")
+				// fmt.Println("We have no space to copy older values, skipping")
 			}
 		}
 		// before the cursor
-		fmt.Println("We have to copy", new_values_size, "values")
+		new_values_size := min(new_size, i+1)
+		// fmt.Println("i =", i, "new_values_size =", new_values_size)
+		// fmt.Println("We have to copy", new_values_size, "values")
 		newer_values_offset := i - new_values_size + 1
 		newer_values := prev_queue[newer_values_offset : newer_values_offset+new_values_size]
-		fmt.Println("We copy the newer values to [written:written+i]:", newer_values)
+		// fmt.Println("We copy the newer values to [written:written+i]:", newer_values)
 		copy(q.queue[written:written+new_values_size], newer_values)
 		written += i
 		q.cursor = written
