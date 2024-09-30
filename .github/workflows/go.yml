@@ -37,4 +37,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: devcleaner-${{ matrix.GOOS }}-${{ matrix.GOARCH }}${{ matrix.GOOS == 'windows' && '.exe' || ''}}
-          path: devcleaner-go
+          path: devcleaner-go${{ matrix.GOOS == 'windows' && '.exe' || ''}}
