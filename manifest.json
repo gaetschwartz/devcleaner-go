@@ -1,5 +1,21 @@
 {
-  "version": 1,
-  "apps": [],
-  "last_updated": ""
+  "apps": [
+    {
+      "name": "homebrew",
+      "path": "/opt/homebrew/bin/brew",
+      "caches": [
+        "{env.HOME}/Library/Caches/Homebrew",
+        "/opt/homebrew/Cellar"
+      ]
+    },
+    {
+      "name": "cargo",
+      "path": "[{env.HOME}/.cargo/bin/cargo,{env.CARGO_HOME}/bin/cargo]",
+      "caches": [
+        "[{env.HOME}/.cargo,{env.CARGO_HOME}]/registry/cache"
+      ]
+    }
+  ],
+  "last_updated": "2024-09-29T15:45:14.749Z",
+  "version": 1
 }

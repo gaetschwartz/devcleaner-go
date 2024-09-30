@@ -71,6 +71,21 @@ type PathContext struct {
 	arch        string
 }
 
+func (p PathPattern) Eval(context *PathContext) (string, error) {
+	handler := slog.NewTextHandler(os.Stderr, nil)
+	logger := slog.New(handler)
+	eval := &PathPatternEvaluator{
+		pattern:    string(p),
+		root:       "",
+		context:    context,
+		l:          logger,
+		filesystem: &RealFileSystem{},
+		lifecycle:  &DefaultRuntime{},
+	}
+
+	return eval.Evaluate()
+}
+
 func NewPathContext() *PathContext {
 	environ_array := os.Environ()
 	environ := make(map[string]string)
@@ -314,7 +329,6 @@ func SplitCommaSeparatedString(s string) ([]string, error) {
 	//   {env.HOME}/path2
 	//   {env.HOME}/path3
 	//   /path4
-	l := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true, Level: slog.LevelDebug}))
 	var result []string
 	i := 0
 	chunk_start := 0
@@ -326,7 +340,6 @@ func SplitCommaSeparatedString(s string) ([]string, error) {
 			result = append(result, s[chunk_start:i])
 			i++
 			chunk_start = i
-			l.Debug("Found comma", "chunk", s[chunk_start:i])
 		case '[':
 			closingBracket := findClosingBracket(s[i:])
 			if closingBracket == -1 {
@@ -343,7 +356,6 @@ func SplitCommaSeparatedString(s string) ([]string, error) {
 	}
 	rest := s[chunk_start:]
 	if len(rest) > 0 {
-		l.Debug("Found rest", "rest", rest)
 		result = append(result, rest)
 	}
 	return result, nil

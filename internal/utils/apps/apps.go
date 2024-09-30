@@ -3,11 +3,9 @@ package apps
 import "github.com/gaetschwartz/devcleaner-go/internal/utils/path"
 
 type App struct {
-	Name string
-	// Path is the path to the app's binary
-	Path path.PathPattern
-	// Caches is a list of paths to the app's caches
-	Caches []path.PathPattern
+	Name   string             `json:"name"`
+	Path   path.PathPattern   `json:"path"`
+	Caches []path.PathPattern `json:"caches"`
 }
 
 var knownApps = []App{
