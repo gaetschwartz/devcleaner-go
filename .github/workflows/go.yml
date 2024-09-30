@@ -36,5 +36,5 @@ jobs:
       - name: Export as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: devcleaner-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+          name: devcleaner-${{ matrix.GOOS }}-${{ matrix.GOARCH }}${{ matrix.GOOS == 'windows' && '.exe' || ''}}
           path: devcleaner-go
