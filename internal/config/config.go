@@ -27,7 +27,7 @@ var Runtime = RuntimeConfig{
 }
 
 const defaultLogLevel = "INFO"
-const defaultManifestUrl = "https://devcleaner.gaetans.dev/manifest.json"
+const defaultManifestUrl = "https://sao.gaetans.dev/manifest.json"
 const defaultLocalManifestTTL = time.Hour * 24
 
 const ansiRed = "\033[31m"
